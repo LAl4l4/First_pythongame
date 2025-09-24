@@ -13,6 +13,8 @@ pygame.display.set_caption("Python Game")
 # 创建角色
 user1 = Player.createplayer()
 
+barrier = glogic.barrier.create_barrier()
+
 # 字体对象
 font = pygame.font.SysFont("Arial", 30)
 
@@ -37,7 +39,7 @@ while running:
     
     pygame.draw.rect(screen, (255, 255, 0), (user1.player_x, user1.player_y, user1.player_width, user1.player_height))
 
-
+    pygame.draw.rect(screen, (128,255,128), (barrier.x,barrier.y,barrier.length,barrier.length))
     # 把文字贴到屏幕上 (x, y 位置)
     screen.blit(name_text, (50, 50))
     screen.blit(atk_text, (50, 100))

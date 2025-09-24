@@ -43,8 +43,8 @@ class barrier:
         self.y = y
         self.length = length
         
-    def create_barrier(self):
-        x=random.randint(0,HEIGHT-self.length/2)
-        y=random.randint(0,WIDTH-self.length/2)
-        bar = barrier(x,y)
+    def create_barrier(length = 80):
+        x=random.randint(0,int(WIDTH-length))
+        y=random.randint(0,int(HEIGHT-length))
+        bar = barrier(x,y,length)
         return bar
