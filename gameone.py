@@ -40,7 +40,11 @@ while running:
     pygame.draw.rect(screen, (255, 255, 0), (user1.player_x, user1.player_y, user1.player_width, user1.player_height))
 
     pygame.draw.rect(screen, (128,255,128), (barrier.x,barrier.y,barrier.length,barrier.length))
+    
+    user1.iscollapse(barrier)
+    
     # 把文字贴到屏幕上 (x, y 位置)
+    
     screen.blit(name_text, (50, 50))
     screen.blit(atk_text, (50, 100))
     screen.blit(hp_text, (50, 150))

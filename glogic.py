@@ -36,6 +36,15 @@ class Player:
             self.player_y = 0
         if self.player_y + self.player_height > HEIGHT:
             self.player_y = HEIGHT - self.player_height
+            
+    def iscollapse(self, bar):
+        if (self.player_x + self.player_width > bar.x and
+            self.player_x < bar.x + bar.length and
+            self.player_y + self.player_height > bar.y and
+            self.player_y < bar.y + bar.length):
+            self.hp = self.hp - 1
+            return True
+        return False
         
 class barrier:
     def __init__(self,x,y,length):
