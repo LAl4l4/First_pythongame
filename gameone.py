@@ -95,7 +95,7 @@ while running:
     screen.blit(name_text, (50, 50))
     screen.blit(atk_text, (50, 100))
     screen.blit(hp_text, (50, 150))
-    clock.tick(60)
+    clock.tick(59)
     # 更新显示内容
     pygame.display.flip()
     

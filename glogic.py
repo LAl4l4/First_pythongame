@@ -1,5 +1,6 @@
 import pygame
 import random
+import noise
 
 WIDTH, HEIGHT = 800, 600
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
@@ -87,10 +88,29 @@ class barrier:
     
 class Map:
     def __init__(self,rowlen,collen,TileSize):
+        scale = 0.15
         self.TileSize = TileSize
         self.rowlen = rowlen
         self.collen = collen
-        self.map = [[random.randint(0, 11) for _ in range(collen)] for _ in range(rowlen)]
+        self.map = [[0 for _ in range(collen)] for _ in range(rowlen)]
+        for i in range(rowlen):
+            for j in range(collen):
+                value = noise.pnoise2(i * scale, j * scale, octaves=4)
+                # 归一化到 0~1
+                norm_value = (value + 1) / 2  
+
+                # 根据区间分配不同地形
+                if norm_value < 0.4:
+                    tile = 1   # 水
+                elif norm_value < 0.45:
+                    tile = 2   # 沙滩
+                elif norm_value < 0.55:
+                    tile = 0   # 草地
+                elif norm_value < 0.6:
+                    tile = 6   # 深色草地
+                else:
+                    tile = 8   # 山地
+                self.map[i][j] = tile
         
     def getMap(rowlen,collen,TileSize):
         map = Map(rowlen,collen,TileSize)
