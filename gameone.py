@@ -6,9 +6,9 @@ import glogic
 pygame.init()
 
 
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = glogic.WIDTH, glogic.HEIGHT
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
-screen = pygame.display.set_mode((800, 600))
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Python Game")
 
 #地图纹理
@@ -30,9 +30,10 @@ user1 = Player.createplayer()
 BarLength = 80
 bars = [glogic.barrier.create_barrier(BarLength) for _ in range(5)]
 
-rowlen = 16
-collen = 12
 TileSize = 100
+rowlen = 2*WIDTH // TileSize
+collen = 2*HEIGHT // TileSize
+
 gMap = glogic.Map.getMap(rowlen,collen,TileSize)
 
 
@@ -41,19 +42,7 @@ font = pygame.font.SysFont("Arial", 30)
 
 clock = pygame.time.Clock()
 
-def draw_map(screen, map_obj, textures, player):
-    for row in range(map_obj.rowlen):
-        for col in range(map_obj.collen):
-            texture_index = map_obj.map[row][col]
-            texture = textures[texture_index]
 
-            world_x = row * map_obj.TileSize
-            world_y = col * map_obj.TileSize
-            screen_x = world_x - player.player_x + CENTER_X
-            screen_y = world_y - player.player_y + CENTER_Y
-
-            if -map_obj.TileSize < screen_x < WIDTH and -map_obj.TileSize < screen_y < HEIGHT:
-                screen.blit(texture, (screen_x, screen_y))
 
 # 游戏主循环
 running = True
@@ -66,7 +55,7 @@ while running:
     screen.fill((0, 128, 255))
     
     #背景部分
-    draw_map(screen,gMap,textures,user1)
+    glogic.Map.draw_map(screen,gMap,textures,user1)
 
     # 渲染玩家名字
     name_text = font.render(f"{user1.name}", True, (255, 255, 255))
@@ -77,7 +66,7 @@ while running:
     # player部分
     user1.move(bars)
     
-    pygame.draw.rect(screen, (255, 255, 0), (CENTER_X, CENTER_Y, user1.player_width, user1.player_height))
+    pygame.draw.rect(screen, (255, 255, 0), (user1.Drawx, user1.Drawy, user1.player_width, user1.player_height))
 
     
     #barrier部分
@@ -86,7 +75,7 @@ while running:
         if -BarLength < bx < WIDTH and -BarLength < by < HEIGHT:
             pygame.draw.rect(screen, (128,255,128), (bx,by,bar.length,bar.length))
             
-
+    user1.attack(bars,screen)
     
 
     
