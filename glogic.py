@@ -2,60 +2,67 @@ import pygame
 import random
 import noise
 import math
+from abc import ABC, abstractmethod
+
 
 WIDTH, HEIGHT = 1000, 800
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
     
+class Attackable(ABC):
+    @abstractmethod
+    def GetCoordinate(self):    
+        pass
+    
+    @abstractmethod
+    def OnAttack(self,player):#返回true如果这个物体被消灭
+        pass
+
 class Player:
-
     def __init__(self,NAME,ATK,HP):
-
         self.player_width, self.player_height = 50, 50
         self.player_speed = 10
         self.name = NAME
         self.atk = ATK
         self.hp = HP
+        self.atkradius = 100
         self.player_x, self.player_y = CENTER_X - self.player_width//2, CENTER_Y - self.player_height//2
         self.Drawx, self.Drawy = CENTER_X - self.player_width//2, CENTER_Y - self.player_height//2
         
-    def createplayer():
+    def createplayer():#外部调用的接口
         user1 = Player("Cosmos",10,100)
         return user1
     
-    def attack(self, bars, screen):
+    def attack(self, Atktarget, screen):
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_f]:
+        counter = 20
+        if not isinstance(Atktarget, list):#判断是否是列表，如果不是，转换成列表
+            Atktarget = [Atktarget]
+        if keys[pygame.K_f] and counter >= 20:
+            counter = 0
+        if  counter < 20:
             attack_radius = 100  # 攻击范围半径
             player_center = (self.player_x + self.player_width//2,
                              self.player_y + self.player_height//2)
+            for obj in Atktarget[:]:
+                if obj.OnAttack(self):
+                    Atktarget.remove(obj)
             self.drawAtk(screen)
-            for bar in bars[:]:
-                bar_center = (bar.x + bar.length//2,
-                              bar.y + bar.length//2)
-
-                # 距离检测
-                distance = math.dist(player_center, bar_center)
-                if distance <= attack_radius:
-                    bars.remove(bar) 
-         
+        
+            
         
     
-    
     def drawAtk(self,screen):
-        attack_radius = 100
+        attack_radius = self.atkradius
         player_center = (self.Drawx + self.player_width//2,
                          self.Drawy + self.player_height//2)
-
         # 半透明圆效果
         surface = pygame.Surface((2*attack_radius, 2*attack_radius), pygame.SRCALPHA)
-        pygame.draw.circle(surface, (255, 0, 0, 80), (attack_radius, attack_radius), attack_radius)
+        pygame.draw.circle(surface, (255, 255, 255, 80), (attack_radius, attack_radius), attack_radius)
         screen.blit(surface, (player_center[0] - attack_radius, player_center[1] - attack_radius))
     
     
-    def move(self,bars):
-
+    def move(self,bars):#传入障碍物数组
         keys = pygame.key.get_pressed()
-
     # 水平方向移动
         if keys[pygame.K_a]:
             self.player_x -= self.player_speed
@@ -67,8 +74,7 @@ class Player:
             for bar in bars:
                 if self.iscollapse(bar):
                     self.player_x -= self.player_speed
-
-    # 垂直方向移动
+        # 垂直方向移动
         if keys[pygame.K_w]:
             self.player_y -= self.player_speed
             for bar in bars:
@@ -81,7 +87,6 @@ class Player:
                     self.player_y -= self.player_speed
                     
         self.boundary()
-
     
     def boundary(self):    
         if self.player_x < 0:
@@ -93,7 +98,7 @@ class Player:
         if self.player_y + self.player_height > 2*HEIGHT:
             self.player_y = 2*HEIGHT - self.player_height
             
-    def iscollapse(self, bar):
+    def iscollapse(self, bar):#传入障碍物
         if (self.player_x + self.player_width > bar.x and
             self.player_x < bar.x + bar.length and
             self.player_y + self.player_height > bar.y and
@@ -102,11 +107,12 @@ class Player:
             return True
         return False
         
-class barrier:
+class barrier(Attackable):
     def __init__(self,x,y,length):
         self.x = x
         self.y = y
         self.length = length
+        
         
     def create_barrier(length):
         x=random.randint(0,int(2*WIDTH-length))
@@ -114,13 +120,27 @@ class barrier:
         bar = barrier(x,y,length)
         return bar
     
-    def BarGetCoodi(self, player):
+    def BarGetCoodi(self, player):#传入玩家实例
         Bx = self.x - player.player_x + player.Drawx
         By = self.y - player.player_y + player.Drawy
-        return Bx, By
-    
-    def isAttacked(self, player):
-        i = 1
+        return Bx, By#返回障碍物在屏幕中的位置
+    #被攻击直接消失，返回true
+    def OnAttack(self, player):
+        px = player.player_x + player.player_width // 2
+        py = player.player_y + player.player_height // 2
+        closestX = max(self.x, min(px, self.x + self.length))
+        closestY = max(self.y, min(py, self.y + self.length))
+        dx = px - closestX
+        dy = py - closestY
+        distance_sq = dx * dx + dy * dy
+        if distance_sq <= player.atkradius * player.atkradius: 
+            return True
+        return False
+        
+    def GetCoordinate(self):
+        x = self.x
+        y = self.y
+        return x, y
     
 class Map:
     def __init__(self,rowlen,collen,TileSize):
@@ -148,11 +168,11 @@ class Map:
                     tile = 8   # 山地
                 self.map[i][j] = tile
         
-    def getMap(rowlen,collen,TileSize):
+    def getMap(rowlen,collen,TileSize):#外部调用方法
         map = Map(rowlen,collen,TileSize)
         return map
     
-    def draw_map(screen, map_obj, textures, player):
+    def draw_map(screen, map_obj, textures, player):#map_obj是getmap返回的，textures是被切割好的图形数组
         for row in range(map_obj.rowlen):
             for col in range(map_obj.collen):
                 texture_index = map_obj.map[row][col]
@@ -165,3 +185,30 @@ class Map:
 
                 if -map_obj.TileSize < screen_x < WIDTH and -map_obj.TileSize < screen_y < HEIGHT:
                     screen.blit(texture, (screen_x, screen_y))
+                    
+class Enemy(Attackable):
+    def __init__(self,atk,hp,speed):
+        self.hp = hp
+        self.atk = atk
+        self.speed = speed
+        
+    def getEnemy(atk,hp,speed):
+        enemy = Enemy(atk,hp,speed)
+        return enemy
+    
+    def OnAttack(self, player):
+        px = player.player_x + player.player_width // 2
+        py = player.player_y + player.player_height // 2
+        closestX = max(self.x, min(px, self.x + self.length))
+        closestY = max(self.y, min(py, self.y + self.length))
+        dx = px - closestX
+        dy = py - closestY
+        distance_sq = dx * dx + dy * dy
+        if distance_sq <= player.atkradius * player.atkradius: 
+            self.hp = self.hp - player.atk
+        if self.hp < 0 :
+            return True
+        return False
+    
+    def GetCoordinate(self):
+        return self.x,self.y

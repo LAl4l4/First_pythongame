@@ -8,7 +8,7 @@ pygame.init()
 
 WIDTH, HEIGHT = glogic.WIDTH, glogic.HEIGHT
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((WIDTH, HEIGHT),pygame.SCALED | pygame.DOUBLEBUF,vsync =1)
 pygame.display.set_caption("Python Game")
 
 #地图纹理
@@ -84,7 +84,7 @@ while running:
     screen.blit(name_text, (50, 50))
     screen.blit(atk_text, (50, 100))
     screen.blit(hp_text, (50, 150))
-    clock.tick(59)
+    clock.tick(60)
     # 更新显示内容
     pygame.display.flip()
     
