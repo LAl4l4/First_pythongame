@@ -17,7 +17,22 @@ class Attackable(ABC):
     def OnAttack(self,player):#返回true如果这个物体被消灭
         pass
 
-class Player:
+class Movable(ABC):
+    @abstractmethod
+    def Move():
+        pass
+
+class Drawable(ABC):
+    @abstractmethod
+    def Draw():
+        pass
+    
+class CanAttack(ABC):
+    @abstractmethod
+    def Attack():
+        pass
+    
+class Player(Movable):
     def __init__(self,NAME,ATK,HP):
         self.player_width, self.player_height = 50, 50
         self.player_speed = 10
@@ -32,7 +47,7 @@ class Player:
         user1 = Player("Cosmos",10,100)
         return user1
     
-    def attack(self, Atktarget, screen):
+    def Attack(self, Atktarget, screen):
         keys = pygame.key.get_pressed()
         counter = 20
         if not isinstance(Atktarget, list):#判断是否是列表，如果不是，转换成列表
@@ -61,7 +76,7 @@ class Player:
         screen.blit(surface, (player_center[0] - attack_radius, player_center[1] - attack_radius))
     
     
-    def move(self,bars):#传入障碍物数组
+    def Move(self,bars):#传入障碍物数组
         keys = pygame.key.get_pressed()
     # 水平方向移动
         if keys[pygame.K_a]:
@@ -142,7 +157,7 @@ class barrier(Attackable):
         y = self.y
         return x, y
     
-class Map:
+class Map():
     def __init__(self,rowlen,collen,TileSize):
         scale = 0.15
         self.TileSize = TileSize
@@ -186,15 +201,35 @@ class Map:
                 if -map_obj.TileSize < screen_x < WIDTH and -map_obj.TileSize < screen_y < HEIGHT:
                     screen.blit(texture, (screen_x, screen_y))
                     
-class Enemy(Attackable):
-    def __init__(self,atk,hp,speed):
+class Enemy(Attackable, Movable, Drawable, ABC):
+    def __init__(self,atk,hp,speed,radius):
         self.hp = hp
         self.atk = atk
         self.speed = speed
+        self.radius = radius
+        self.x = random.randint(0, 2*WIDTH)
+        self.y = random.randint(0, 2*HEIGHT)
         
-    def getEnemy(atk,hp,speed):
-        enemy = Enemy(atk,hp,speed)
+    def getEnemy(atk,hp,speed,radius):
+        enemy = Enemy(atk,hp,speed,radius)
         return enemy
+    
+    def Move(self, player):
+        # 计算敌人到玩家的方向向量
+        dx = player.player_x - self.x
+        dy = player.player_y - self.y
+        distance = math.sqrt(dx**2 + dy**2)
+
+        # 如果距离大于0，按比例移动
+        if distance > 0:
+            self.x += self.speed * dx / distance
+            self.y += self.speed * dy / distance
+            
+    def Draw(self, screen, player):
+        screen_x = self.x - player.player_x + player.Drawx
+        screen_y = self.y - player.player_y + player.Drawy
+        if -self.radius < screen_x < WIDTH and -self.radius < screen_y < HEIGHT:
+            pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, self.radius, self.radius))
     
     def OnAttack(self, player):
         px = player.player_x + player.player_width // 2

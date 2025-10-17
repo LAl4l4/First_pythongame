@@ -27,13 +27,21 @@ for row in range(3):
 # 创建角色
 user1 = Player.createplayer()
 
+# create barrier
 BarLength = 80
 bars = [glogic.barrier.create_barrier(BarLength) for _ in range(5)]
 
+# create enemy
+EnemyHP = 100
+EnemyATK = 20
+EnemySpeed = 5
+EnemyRadius = 100
+Enemies = [glogic.Enemy.getEnemy(EnemyATK, EnemyHP, EnemySpeed,EnemyRadius) for _ in range(3)]
+
+# create map
 TileSize = 100
 rowlen = 2*WIDTH // TileSize
 collen = 2*HEIGHT // TileSize
-
 gMap = glogic.Map.getMap(rowlen,collen,TileSize)
 
 
@@ -42,7 +50,18 @@ font = pygame.font.SysFont("Arial", 30)
 
 clock = pygame.time.Clock()
 
-
+# 装入Movable Drawable Attackable
+# 把每个元素和它的参数打包成元组整体装入列表
+movable_objects = [
+    [user1, [bars]],  
+    *[(enemy, [user1]) for enemy in Enemies]
+]
+drawable_objects = [
+    *[(enemy, [screen, user1]) for enemy in Enemies]
+] 
+attackable_objects = [
+    *[(enemy, [user1]) for enemy in Enemies]
+]
 
 # 游戏主循环
 running = True
@@ -64,18 +83,23 @@ while running:
     
     
     # player部分
-    user1.move(bars)
-    
     pygame.draw.rect(screen, (255, 255, 0), (user1.Drawx, user1.Drawy, user1.player_width, user1.player_height))
 
+    # Move part
+    for obj, params in movable_objects:
+        obj.Move(*params)  # 解包参数并传递给 Move 方法
     
+    # Draw part
+    for obj, params in drawable_objects:
+        obj.Draw(*params)# 这里写draw的解包
+        
     #barrier部分
     for bar in bars:
         bx, by = bar.BarGetCoodi(user1) 
         if -BarLength < bx < WIDTH and -BarLength < by < HEIGHT:
             pygame.draw.rect(screen, (128,255,128), (bx,by,bar.length,bar.length))
             
-    user1.attack(bars,screen)
+    user1.Attack(bars,screen)
     
 
     
@@ -89,8 +113,6 @@ while running:
     pygame.display.flip()
     
     
-
-
 
 # 退出 Pygame
 pygame.quit()
