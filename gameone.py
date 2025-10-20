@@ -47,72 +47,76 @@ gMap = glogic.Map.getMap(rowlen,collen,TileSize)
 
 # 字体对象
 font = pygame.font.SysFont("Arial", 30)
-
+# 控制游戏帧率的时钟对象
 clock = pygame.time.Clock()
 
-# 装入Movable Drawable Attackable
+# 装入totalObj Movable Drawable Attackable
 # 把每个元素和它的参数打包成元组整体装入列表
+totalObj = [user1, gMap, *bars, *Enemies]
 movable_objects = [
     [user1, [bars]],  
     *[(enemy, [user1]) for enemy in Enemies]
 ]
+IsRepackageDrawable = [False]#把这个存为可变类型，这样glogic里改了就能反映到这里
 drawable_objects = [
+    *[(gMap, [screen, textures, user1])],
+    *[(bar, [screen, user1]) for bar in bars],
     *[(enemy, [screen, user1]) for enemy in Enemies]
 ] 
 attackable_objects = [
+    *[(bar, [user1]) for bar in bars],
     *[(enemy, [user1]) for enemy in Enemies]
 ]
+canAttack_objects = [
+    [user1, [screen]]
+]
+
+# 创建游戏世界对象
+GameWorld = glogic.GameWorld(
+    totalObj, drawable_objects, 
+    movable_objects, attackable_objects,
+    canAttack_objects)
 
 # 游戏主循环
 running = True
 while running:
+    #如果退出了就把游戏关了
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
     # 填充背景颜色（RGB）
     screen.fill((0, 128, 255))
-    
-    #背景部分
-    glogic.Map.draw_map(screen,gMap,textures,user1)
 
     # 渲染玩家名字
     name_text = font.render(f"{user1.name}", True, (255, 255, 255))
     atk_text = font.render(f"ATK: {user1.atk}", True, (255, 255, 255))
     hp_text = font.render(f"HP: {user1.hp}", True, (255, 255, 255))
     
-    
+    # game world update    
+    GameWorld.updateMove()
+    GameWorld.updateDraw()
+    GameWorld.updateCanAttack()
+    GameWorld.updateAttack()
+    GameWorld.updateRemoveObjects()
+            
     # player部分
     pygame.draw.rect(screen, (255, 255, 0), (user1.Drawx, user1.Drawy, user1.player_width, user1.player_height))
-
-    # Move part
-    for obj, params in movable_objects:
-        obj.Move(*params)  # 解包参数并传递给 Move 方法
-    
-    # Draw part
-    for obj, params in drawable_objects:
-        obj.Draw(*params)# 这里写draw的解包
-        
-    #barrier部分
-    for bar in bars:
-        bx, by = bar.BarGetCoodi(user1) 
-        if -BarLength < bx < WIDTH and -BarLength < by < HEIGHT:
-            pygame.draw.rect(screen, (128,255,128), (bx,by,bar.length,bar.length))
-            
-    user1.Attack(bars,screen)
     
 
     
-    # 把文字贴到屏幕上 (x, y 位置)
-    
+    # 把文字贴到屏幕上 (x, y 位置)    
     screen.blit(name_text, (50, 50))
     screen.blit(atk_text, (50, 100))
     screen.blit(hp_text, (50, 150))
+    # 控制帧率
     clock.tick(60)
     # 更新显示内容
     pygame.display.flip()
     
     
-
 # 退出 Pygame
 pygame.quit()
+
+def drawfont():
+    pass

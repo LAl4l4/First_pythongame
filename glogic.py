@@ -31,8 +31,58 @@ class CanAttack(ABC):
     @abstractmethod
     def Attack():
         pass
+
+class GameWorld:
+    def __init__(self, totalObj, drawable, movable, attackable, canAttack):
+        self.totalObj = totalObj
+        self.drawable = drawable
+        self.movable = movable
+        self.attackable = attackable
+        self.canAttack = canAttack
+        self.removedObj = []
+        self.IsUserAttacking = False
+        
+    def updateMove(self):
+        for obj, params in self.movable:
+            obj.Move(*params)
+            
+    def updateDraw(self):
+        for obj, params in self.drawable:
+            obj.Draw(*params)
     
-class Player(Movable):
+    def updateAttack(self):
+        for obj, params in self.attackable:
+            if not self.IsUserAttacking:
+                return
+            if obj.OnAttack(*params):
+                self.removedObj.append(obj)
+        self.IsUserAttacking = False
+                
+    def updateCanAttack(self):
+        for obj, params in self.canAttack:
+            if obj.Attack(*params):
+                self.IsUserAttacking = True
+                
+    def updateRemoveObjects(self):
+        for obj in self.removedObj:
+            if obj in self.totalObj:
+                self.totalObj.remove(obj)
+            
+        for obj, params in self.drawable[:]:
+            if obj in self.removedObj:
+                self.drawable.remove((obj, params))
+        
+        for obj, params in self.movable[:]:
+            if obj in self.removedObj:
+                self.movable.remove((obj, params))
+                
+        for obj, params in self.attackable[:]:
+            if obj in self.removedObj:
+                self.attackable.remove((obj, params))
+        
+        self.removedObj = []
+    
+class Player(Movable, CanAttack):
     def __init__(self,NAME,ATK,HP):
         self.player_width, self.player_height = 50, 50
         self.player_speed = 10
@@ -42,30 +92,23 @@ class Player(Movable):
         self.atkradius = 100
         self.player_x, self.player_y = CENTER_X - self.player_width//2, CENTER_Y - self.player_height//2
         self.Drawx, self.Drawy = CENTER_X - self.player_width//2, CENTER_Y - self.player_height//2
+        self.AtkCounter = 0
         
     def createplayer():#外部调用的接口
         user1 = Player("Cosmos",10,100)
         return user1
     
-    def Attack(self, Atktarget, screen):
+    def Attack(self, screen):
         keys = pygame.key.get_pressed()
-        counter = 20
-        if not isinstance(Atktarget, list):#判断是否是列表，如果不是，转换成列表
-            Atktarget = [Atktarget]
-        if keys[pygame.K_f] and counter >= 20:
-            counter = 0
-        if  counter < 20:
-            attack_radius = 100  # 攻击范围半径
-            player_center = (self.player_x + self.player_width//2,
-                             self.player_y + self.player_height//2)
-            for obj in Atktarget[:]:
-                if obj.OnAttack(self):
-                    Atktarget.remove(obj)
+        if keys[pygame.K_f] and self.AtkCounter == 0:
+            self.AtkCounter = 40 
+        if self.AtkCounter > 0:
+            self.AtkCounter -= 1
+        if self.AtkCounter > 30:
             self.drawAtk(screen)
-        
-            
-        
-    
+            return True
+        return False
+           
     def drawAtk(self,screen):
         attack_radius = self.atkradius
         player_center = (self.Drawx + self.player_width//2,
@@ -99,8 +142,7 @@ class Player(Movable):
             self.player_y += self.player_speed
             for bar in bars:
                 if self.iscollapse(bar):
-                    self.player_y -= self.player_speed
-                    
+                    self.player_y -= self.player_speed           
         self.boundary()
     
     def boundary(self):    
@@ -118,11 +160,10 @@ class Player(Movable):
             self.player_x < bar.x + bar.length and
             self.player_y + self.player_height > bar.y and
             self.player_y < bar.y + bar.length):
-        #    self.hp = self.hp - 1
             return True
         return False
         
-class barrier(Attackable):
+class barrier(Attackable, Drawable):
     def __init__(self,x,y,length):
         self.x = x
         self.y = y
@@ -157,7 +198,16 @@ class barrier(Attackable):
         y = self.y
         return x, y
     
-class Map():
+    #draw方法
+    def Draw(self, screen, player):
+        #算出距离玩家绘制坐标的差值
+        screen_x = self.x - player.player_x + player.Drawx
+        screen_y = self.y - player.player_y + player.Drawy
+        #出屏幕就不画
+        if -self.length < screen_x < WIDTH and -self.length < screen_y < HEIGHT:
+            pygame.draw.rect(screen, (128,255,128), (screen_x,screen_y,self.length,self.length))
+    
+class Map(Drawable):
     def __init__(self,rowlen,collen,TileSize):
         scale = 0.15
         self.TileSize = TileSize
@@ -187,18 +237,18 @@ class Map():
         map = Map(rowlen,collen,TileSize)
         return map
     
-    def draw_map(screen, map_obj, textures, player):#map_obj是getmap返回的，textures是被切割好的图形数组
-        for row in range(map_obj.rowlen):
-            for col in range(map_obj.collen):
-                texture_index = map_obj.map[row][col]
+    def Draw(self, screen, textures, player):#map_obj是getmap返回的，textures是被切割好的图形数组
+        for row in range(self.rowlen):
+            for col in range(self.collen):
+                texture_index = self.map[row][col]
                 texture = textures[texture_index]
 
-                world_x = row * map_obj.TileSize
-                world_y = col * map_obj.TileSize
+                world_x = row * self.TileSize
+                world_y = col * self.TileSize
                 screen_x = world_x - player.player_x + player.Drawx
                 screen_y = world_y - player.player_y + player.Drawy
 
-                if -map_obj.TileSize < screen_x < WIDTH and -map_obj.TileSize < screen_y < HEIGHT:
+                if -self.TileSize < screen_x < WIDTH and -self.TileSize < screen_y < HEIGHT:
                     screen.blit(texture, (screen_x, screen_y))
                     
 class Enemy(Attackable, Movable, Drawable, ABC):
@@ -234,8 +284,8 @@ class Enemy(Attackable, Movable, Drawable, ABC):
     def OnAttack(self, player):
         px = player.player_x + player.player_width // 2
         py = player.player_y + player.player_height // 2
-        closestX = max(self.x, min(px, self.x + self.length))
-        closestY = max(self.y, min(py, self.y + self.length))
+        closestX = max(self.x, min(px, self.x + self.radius))
+        closestY = max(self.y, min(py, self.y + self.radius))
         dx = px - closestX
         dy = py - closestY
         distance_sq = dx * dx + dy * dy
