@@ -8,14 +8,7 @@ from abc import ABC, abstractmethod
 WIDTH, HEIGHT = 1000, 800
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
     
-class Attackable(ABC):
-    @abstractmethod
-    def GetCoordinate(self):    
-        pass
-    
-    @abstractmethod
-    def OnAttack(self,player):#返回true如果这个物体被消灭
-        pass
+
 
 class Movable(ABC):
     @abstractmethod
@@ -26,42 +19,49 @@ class Drawable(ABC):
     @abstractmethod
     def Draw():
         pass
-    
-class CanAttack(ABC):
-    @abstractmethod
-    def Attack():
-        pass
 
-class GameWorld:
-    def __init__(self, totalObj, drawable, movable, attackable, canAttack):
+class GameWorld:#干脆就把整个gameworld类传进去吧，省的各种打包
+    def __init__(self, totalObj, 
+                 drawable, movable, 
+                 screen):
         self.totalObj = totalObj
         self.drawable = drawable
         self.movable = movable
-        self.attackable = attackable
-        self.canAttack = canAttack
+        self.screen = screen
+        self.attackable = []
+        self.canAttack = []
+        self.obstacle = []
         self.removedObj = []
-        self.IsUserAttacking = False
-        
+
+    #统一先传obstacle，全都绕道走
     def updateMove(self):
         for obj, params in self.movable:
-            obj.Move(*params)
+            obj.Move(self.obstacle, *params)
             
     def updateDraw(self):
         for obj, params in self.drawable:
             obj.Draw(*params)
     
+                             
     def updateAttack(self):
-        for obj, params in self.attackable:
-            if not self.IsUserAttacking:
-                return
-            if obj.OnAttack(*params):
-                self.removedObj.append(obj)
-        self.IsUserAttacking = False
+        for obj in self.canAttack:
+            obj.Atk(self.attackable, self.screen)
+            for target in self.attackable:
+                if target.hp <= 0:
+                    self.removedObj.append(target)
+
+    def updatePackageData(self):
+        self.obstacle = []
+        self.canAttack = []
+        self.attackable = []
+        for obj in self.totalObj:
+            if obj.IsCollidable:
+                self.obstacle.append(obj)
+            if isinstance(obj, CanAttack):
+                self.canAttack.append(obj)
+            if isinstance(obj, Attackable):
+                self.attackable.append(obj)
                 
-    def updateCanAttack(self):
-        for obj, params in self.canAttack:
-            if obj.Attack(*params):
-                self.IsUserAttacking = True
                 
     def updateRemoveObjects(self):
         for obj in self.removedObj:
@@ -74,40 +74,110 @@ class GameWorld:
         
         for obj, params in self.movable[:]:
             if obj in self.removedObj:
-                self.movable.remove((obj, params))
-                
-        for obj, params in self.attackable[:]:
-            if obj in self.removedObj:
-                self.attackable.remove((obj, params))
-        
+                self.movable.remove((obj, params))       
         self.removedObj = []
+
+class AtkSystem(ABC):
+    def Atk(self, target, screen):
+        self.AtkStatus()
+        if not self.IsAttacking:
+            return
+        self.drawAtk(screen)
+        for TargetObj in target:
+            if self.atkType == "player":
+                self.AtkPlayer(TargetObj, screen)
+            if self.atkType == "enemynormal":
+                self.AtkEnemyNormal(TargetObj, screen)
+            
+    def AtkPlayer(self, target, screen):    #need: IsAttacking，CanAtkWho，atk，hp
+        CanAtk = False
+        if not self.IsAttacking:
+            return
+        for obj in self.CanAtkWho:
+            if isinstance(target, obj):
+                CanAtk = True
+        if self.IsInRadius(target) and CanAtk:  
+            target.hp = target.hp - self.atk
+            target.drawOnAtk(screen)
+        
+    def AtkEnemyNormal(self, target, screen):  #need: IsAttacking，CanAtkWho，atk，hp
+        CanAtk = False
+        if not self.IsAttacking:
+            return
+        for obj in self.CanAtkWho:
+            if isinstance(target, obj):
+                CanAtk = True
+        if self.IsInRadius(target) and CanAtk:  
+            target.hp = target.hp - self.atk
+            self.drawAtk(screen)
+            target.drawOnAtk(screen)
     
-class Player(Movable, CanAttack):
-    def __init__(self,NAME,ATK,HP):
-        self.player_width, self.player_height = 50, 50
+    def IsInRadius(self, target): #need：x, y, atkradius
+        selfX, selfY = self.GetCenterCoordinate()
+        targetX, targetY = target.GetCenterCoordinate()
+        dx = selfX - targetX
+        dy = selfY - targetY
+        return dx*dx + dy*dy <= self.atkradius * self.atkradius
+    
+    @abstractmethod
+    def GetCenterCoordinate(self):    
+        pass
+    
+class Attackable(AtkSystem):
+    @abstractmethod
+    def drawOnAtk():
+        pass
+    
+class CanAttack(AtkSystem):
+    @abstractmethod
+    def drawAtk():
+        pass
+    
+    @abstractmethod
+    def AtkStatus():#更新攻击状态
+        pass
+   
+class Player(Movable, CanAttack, Drawable):
+    def __init__(self, NAME, ATK, HP, width, height):
+        self.player_width, self.player_height = width, height
         self.player_speed = 10
         self.name = NAME
         self.atk = ATK
         self.hp = HP
-        self.atkradius = 100
+        self.atkradius = 150
         self.player_x, self.player_y = CENTER_X - self.player_width//2, CENTER_Y - self.player_height//2
         self.Drawx, self.Drawy = CENTER_X - self.player_width//2, CENTER_Y - self.player_height//2
         self.AtkCounter = 0
+        self.facing_right = True 
         
+        self.IsAttacking = False
+        self.CanAtkWho = [barrier, Enemy]
+        self.IsCollidable = False
+        self.atkType = "player"
+
+    def GetCenterCoordinate(self):    
+        return self.player_x + self.player_width//2, self.player_y + self.player_height//2
+         
+    def Draw(self, screen, ImgLeft, ImgRight):
+        if  self.facing_right:
+            screen.blit(ImgRight, (self.Drawx, self.Drawy))
+        else:
+            screen.blit(ImgLeft, (self.Drawx, self.Drawy))
+    
     def createplayer():#外部调用的接口
-        user1 = Player("Cosmos",10,100)
+        user1 = Player("Cosmos",10,100, 150, 150)
         return user1
     
-    def Attack(self, screen):
+    def AtkStatus(self):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_f] and self.AtkCounter == 0:
-            self.AtkCounter = 40 
+            self.AtkCounter = 40
         if self.AtkCounter > 0:
             self.AtkCounter -= 1
         if self.AtkCounter > 30:
-            self.drawAtk(screen)
-            return True
-        return False
+            self.IsAttacking = True
+            return
+        self.IsAttacking = False
            
     def drawAtk(self,screen):
         attack_radius = self.atkradius
@@ -124,11 +194,13 @@ class Player(Movable, CanAttack):
     # 水平方向移动
         if keys[pygame.K_a]:
             self.player_x -= self.player_speed
+            self.facing_right = False
             for bar in bars:
                 if self.iscollapse(bar):
                     self.player_x += self.player_speed
         if keys[pygame.K_d]:
             self.player_x += self.player_speed
+            self.facing_right = True
             for bar in bars:
                 if self.iscollapse(bar):
                     self.player_x -= self.player_speed
@@ -164,39 +236,37 @@ class Player(Movable, CanAttack):
         return False
         
 class barrier(Attackable, Drawable):
-    def __init__(self,x,y,length):
+    def __init__(self,x,y,length, Img):
         self.x = x
         self.y = y
         self.length = length
+        self.Img = Img
         
-        
-    def create_barrier(length):
+        self.IsCollidable = True
+        self.hp = 1
+      
+    def create_barrier(length, player, Img):
         x=random.randint(0,int(2*WIDTH-length))
         y=random.randint(0,int(2*HEIGHT-length))
-        bar = barrier(x,y,length)
+        if x > player.player_x - length and x < player.player_x + player.player_width:
+            x = x + length + player.player_width
+        if y > player.player_y - length and y < player.player_y + player.player_height:
+            y = y + length + player.player_height
+        bar = barrier(x,y,length, Img)
         return bar
     
     def BarGetCoodi(self, player):#传入玩家实例
         Bx = self.x - player.player_x + player.Drawx
         By = self.y - player.player_y + player.Drawy
         return Bx, By#返回障碍物在屏幕中的位置
-    #被攻击直接消失，返回true
-    def OnAttack(self, player):
-        px = player.player_x + player.player_width // 2
-        py = player.player_y + player.player_height // 2
-        closestX = max(self.x, min(px, self.x + self.length))
-        closestY = max(self.y, min(py, self.y + self.length))
-        dx = px - closestX
-        dy = py - closestY
-        distance_sq = dx * dx + dy * dy
-        if distance_sq <= player.atkradius * player.atkradius: 
-            return True
-        return False
+
+    def drawOnAtk(self, screen):
+        pass
         
-    def GetCoordinate(self):
+    def GetCenterCoordinate(self):
         x = self.x
         y = self.y
-        return x, y
+        return x + self.length//2, y + self.length//2
     
     #draw方法
     def Draw(self, screen, player):
@@ -205,10 +275,12 @@ class barrier(Attackable, Drawable):
         screen_y = self.y - player.player_y + player.Drawy
         #出屏幕就不画
         if -self.length < screen_x < WIDTH and -self.length < screen_y < HEIGHT:
-            pygame.draw.rect(screen, (128,255,128), (screen_x,screen_y,self.length,self.length))
+            screen.blit(self.Img, (screen_x, screen_y))
     
 class Map(Drawable):
     def __init__(self,rowlen,collen,TileSize):
+        self.IsCollidable = False
+        
         scale = 0.15
         self.TileSize = TileSize
         self.rowlen = rowlen
@@ -251,27 +323,34 @@ class Map(Drawable):
                 if -self.TileSize < screen_x < WIDTH and -self.TileSize < screen_y < HEIGHT:
                     screen.blit(texture, (screen_x, screen_y))
                     
-class Enemy(Attackable, Movable, Drawable, ABC):
-    def __init__(self,atk,hp,speed,radius):
+class Enemy(Attackable, Movable, Drawable):
+    def __init__(self,atk,hp,speed,radius, atkradius, Img):
         self.hp = hp
         self.atk = atk
         self.speed = speed
         self.radius = radius
         self.x = random.randint(0, 2*WIDTH)
         self.y = random.randint(0, 2*HEIGHT)
+        self.Img = Img
         
-    def getEnemy(atk,hp,speed,radius):
-        enemy = Enemy(atk,hp,speed,radius)
+        self.atkradius = atkradius
+        self.IsAttacking = False
+        self.CanAtkWho = [Player]
+        self.IsCollidable = False
+        self.atkType = "enemynormal"
+        
+    def getEnemy(atk,hp,speed,radius,atkradius, Img):
+        enemy = Enemy(atk,hp,speed,radius,atkradius, Img)
         return enemy
     
-    def Move(self, player):
+    def Move(self, notusedobst, player):
         # 计算敌人到玩家的方向向量
         dx = player.player_x - self.x
         dy = player.player_y - self.y
         distance = math.sqrt(dx**2 + dy**2)
 
         # 如果距离大于0，按比例移动
-        if distance > 0:
+        if distance > 20:
             self.x += self.speed * dx / distance
             self.y += self.speed * dy / distance
             
@@ -279,21 +358,13 @@ class Enemy(Attackable, Movable, Drawable, ABC):
         screen_x = self.x - player.player_x + player.Drawx
         screen_y = self.y - player.player_y + player.Drawy
         if -self.radius < screen_x < WIDTH and -self.radius < screen_y < HEIGHT:
-            pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, self.radius, self.radius))
+            screen.blit(self.Img, (screen_x, screen_y))
     
-    def OnAttack(self, player):
-        px = player.player_x + player.player_width // 2
-        py = player.player_y + player.player_height // 2
-        closestX = max(self.x, min(px, self.x + self.radius))
-        closestY = max(self.y, min(py, self.y + self.radius))
-        dx = px - closestX
-        dy = py - closestY
-        distance_sq = dx * dx + dy * dy
-        if distance_sq <= player.atkradius * player.atkradius: 
-            self.hp = self.hp - player.atk
-        if self.hp < 0 :
-            return True
-        return False
+    def AtkStatus(self):
+        pass
     
-    def GetCoordinate(self):
-        return self.x,self.y
+    def drawOnAtk(self, screen):
+        pass
+    
+    def GetCenterCoordinate(self):
+        return self.x + self.radius, self.y + self.radius

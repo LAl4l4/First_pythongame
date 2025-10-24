@@ -12,7 +12,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT),pygame.SCALED | pygame.DOUBLEBU
 pygame.display.set_caption("Python Game")
 
 #地图纹理
-texture_img = pygame.image.load("pygameone/map_background.png").convert()
+texture_img = pygame.image.load("pygameone/Materials/map_background.png").convert()
 tile_width = texture_img.get_width() // 3 - 1
 tile_height = texture_img.get_height() // 4 - 1
 
@@ -26,17 +26,28 @@ for row in range(3):
 
 # 创建角色
 user1 = Player.createplayer()
+PlayerImg = pygame.image.load("pygameone/Materials/player_transcript.png").convert_alpha()
+PlayerImg = pygame.transform.scale(PlayerImg, (user1.player_width, user1.player_height))
+PlayerImgRight = pygame.transform.flip(PlayerImg, True, False)
+
 
 # create barrier
 BarLength = 80
-bars = [glogic.barrier.create_barrier(BarLength) for _ in range(5)]
+barimg = pygame.image.load("pygameone/Materials/obstaclestone.png").convert_alpha()
+barimg = pygame.transform.scale(barimg, (BarLength*2, BarLength*2))
+bars = [glogic.barrier.create_barrier(BarLength, user1, barimg) for _ in range(5)]
 
 # create enemy
 EnemyHP = 100
 EnemyATK = 20
 EnemySpeed = 5
 EnemyRadius = 100
-Enemies = [glogic.Enemy.getEnemy(EnemyATK, EnemyHP, EnemySpeed,EnemyRadius) for _ in range(3)]
+EnemyAtkRadius = 150
+EnemyImg = pygame.image.load("pygameone/Materials/diren1.png").convert_alpha()
+EnemyImg = pygame.transform.scale(EnemyImg, (EnemyRadius*2, EnemyRadius*2))
+Enemies = [glogic.Enemy.getEnemy(
+    EnemyATK, EnemyHP, EnemySpeed, EnemyRadius, EnemyAtkRadius, EnemyImg
+    ) for _ in range(3)]
 
 # create map
 TileSize = 100
@@ -52,30 +63,22 @@ clock = pygame.time.Clock()
 
 # 装入totalObj Movable Drawable Attackable
 # 把每个元素和它的参数打包成元组整体装入列表
-totalObj = [user1, gMap, *bars, *Enemies]
+totalObj = [gMap, user1, *bars, *Enemies]
 movable_objects = [
-    [user1, [bars]],  
+    [user1, []],  
     *[(enemy, [user1]) for enemy in Enemies]
 ]
-IsRepackageDrawable = [False]#把这个存为可变类型，这样glogic里改了就能反映到这里
-drawable_objects = [
+drawable_objects = [ #后画的会覆盖先画的，所以地图要最先画
     *[(gMap, [screen, textures, user1])],
     *[(bar, [screen, user1]) for bar in bars],
-    *[(enemy, [screen, user1]) for enemy in Enemies]
+    *[(enemy, [screen, user1]) for enemy in Enemies],
+    [user1, [screen, PlayerImg, PlayerImgRight]]
 ] 
-attackable_objects = [
-    *[(bar, [user1]) for bar in bars],
-    *[(enemy, [user1]) for enemy in Enemies]
-]
-canAttack_objects = [
-    [user1, [screen]]
-]
 
 # 创建游戏世界对象
 GameWorld = glogic.GameWorld(
     totalObj, drawable_objects, 
-    movable_objects, attackable_objects,
-    canAttack_objects)
+    movable_objects, screen)
 
 # 游戏主循环
 running = True
@@ -96,14 +99,10 @@ while running:
     # game world update    
     GameWorld.updateMove()
     GameWorld.updateDraw()
-    GameWorld.updateCanAttack()
     GameWorld.updateAttack()
     GameWorld.updateRemoveObjects()
+    GameWorld.updatePackageData()
             
-    # player部分
-    pygame.draw.rect(screen, (255, 255, 0), (user1.Drawx, user1.Drawy, user1.player_width, user1.player_height))
-    
-
     
     # 把文字贴到屏幕上 (x, y 位置)    
     screen.blit(name_text, (50, 50))
@@ -118,5 +117,3 @@ while running:
 # 退出 Pygame
 pygame.quit()
 
-def drawfont():
-    pass
