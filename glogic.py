@@ -9,51 +9,120 @@ WIDTH, HEIGHT = 1000, 800
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
     
 
+class interfaceManager():
+    def __init__(self, screen, basepath, gameworld):
+        self.screen = screen
+        self.window = "menu"
+        self.basepath = basepath
+        self.font = pygame.font.SysFont("Arial", 40)
+        self.menu = mainMenu(self.screen, self.font)
+        self.event = pygame.event.get()
+        self.gameworld = gameworld
+        
+    def drawWindow(self):
+        if self.window == "menu":
+            self.menu.drawMenu()
+        elif self.window == "game":
+            pass
+        
+    def updateWindow(self):
+        self.event = pygame.event.get()
+        
+        choice = self.menu.clickHandle(self.event)   
+                                  
+        if choice == "start":
+            self.window = "game"
+        elif choice == "quit":
+            self.window = "quit"
+        elif choice == "menu":
+            self.window = "menu"
 
-class Movable(ABC):
-    @abstractmethod
-    def Move():
+class pageChecker():
+    def __init__(self):
+        pass
+           
+class mainMenu():
+    def __init__(self, screen, font):
+        self.screen = screen
+        self.font = font
+        self.buttons = {
+            "start": pygame.Rect(300, 200, 200, 60),
+            "quit": pygame.Rect(300, 300, 200, 60),
+        }
+        
+    def drawMenu(self):
+        self.screen.fill((30, 30, 60))
+        for text, rect in self.buttons.items():
+            pygame.draw.rect(self.screen, (100, 100, 200), rect)
+            label = self.font.render(text.upper(), True, (255, 255, 255))
+            self.screen.blit(label, (rect.x + 50, rect.y + 15))
+            
+    def clickHandle(self, events):
+        for e in events:
+            if e.type == pygame.MOUSEBUTTONDOWN:
+                mx, my = e.pos
+                for name, rect in self.buttons.items():
+                    if rect.collidepoint(mx, my):
+                        return name
+        return None      
+
+class gameLoader():
+    def __init__(self, screen, basepath):
+        self.screen = screen
+        self.basepath = basepath
+    
+    def iniGame(self):
         pass
 
-class Drawable(ABC):
-    @abstractmethod
-    def Draw():
-        pass
-
-class GameWorld:#干脆就把整个gameworld类传进去吧，省的各种打包
+class GameWorld():#干脆就把整个gameworld类传进去吧，省的各种打包
     def __init__(self, totalObj, 
                  drawable, movable, 
-                 screen):
+                 screen, player):
         self.totalObj = totalObj
         self.drawable = drawable
         self.movable = movable
         self.screen = screen
+        self.player = player
         self.attackable = []
         self.canAttack = []
         self.obstacle = []
         self.removedObj = []
+        self.DrawXYneeder = []
 
+    def escapeHandle(self, events):
+        for e in events:
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+                return "menu"
+        return None
+    
     #统一先传obstacle，全都绕道走
     def updateMove(self):
         for obj, params in self.movable:
             obj.Move(self.obstacle, *params)
             
-    def updateDraw(self):
+    def updateDrawXY(self):
+        for obj in self.DrawXYneeder:
+            obj.updateScreenXY(self.player)
+    
+    def Draw(self):
         for obj, params in self.drawable:
             obj.Draw(*params)
     
+    def generateEnemy():
+        pass
                              
-    def updateAttack(self):
+    def Attack(self):
         for obj in self.canAttack:
             obj.Atk(self.attackable, self.screen)
             for target in self.attackable:
-                if target.hp <= 0:
+                if target.hp <= 0 and not isinstance(target, Player):
                     self.removedObj.append(target)
 
     def updatePackageData(self):
         self.obstacle = []
         self.canAttack = []
         self.attackable = []
+        self.DrawXYneeder = []
         for obj in self.totalObj:
             if obj.IsCollidable:
                 self.obstacle.append(obj)
@@ -61,7 +130,8 @@ class GameWorld:#干脆就把整个gameworld类传进去吧，省的各种打包
                 self.canAttack.append(obj)
             if isinstance(obj, Attackable):
                 self.attackable.append(obj)
-                
+            if isinstance(obj, ScreenXYUpdater):
+                self.DrawXYneeder.append(obj)
                 
     def updateRemoveObjects(self):
         for obj in self.removedObj:
@@ -77,12 +147,19 @@ class GameWorld:#干脆就把整个gameworld类传进去吧，省的各种打包
                 self.movable.remove((obj, params))       
         self.removedObj = []
 
+class Movable(ABC):
+    @abstractmethod
+    def Move():
+        pass
+
 class AtkSystem(ABC):
     def Atk(self, target, screen):
-        self.AtkStatus()
+        self.AtkStatus(target)
         if not self.IsAttacking:
             return
         self.drawAtk(screen)
+        if not self.IsDamageTick():
+            return
         for TargetObj in target:
             if self.atkType == "player":
                 self.AtkPlayer(TargetObj, screen)
@@ -91,8 +168,6 @@ class AtkSystem(ABC):
             
     def AtkPlayer(self, target, screen):    #need: IsAttacking，CanAtkWho，atk，hp
         CanAtk = False
-        if not self.IsAttacking:
-            return
         for obj in self.CanAtkWho:
             if isinstance(target, obj):
                 CanAtk = True
@@ -102,14 +177,11 @@ class AtkSystem(ABC):
         
     def AtkEnemyNormal(self, target, screen):  #need: IsAttacking，CanAtkWho，atk，hp
         CanAtk = False
-        if not self.IsAttacking:
-            return
         for obj in self.CanAtkWho:
             if isinstance(target, obj):
                 CanAtk = True
         if self.IsInRadius(target) and CanAtk:  
             target.hp = target.hp - self.atk
-            self.drawAtk(screen)
             target.drawOnAtk(screen)
     
     def IsInRadius(self, target): #need：x, y, atkradius
@@ -125,19 +197,51 @@ class AtkSystem(ABC):
     
 class Attackable(AtkSystem):
     @abstractmethod
-    def drawOnAtk():
+    def drawOnAtk(self, screen):
         pass
     
 class CanAttack(AtkSystem):
     @abstractmethod
-    def drawAtk():
+    def drawAtk(self, screen):
         pass
     
     @abstractmethod
-    def AtkStatus():#更新攻击状态
+    def AtkStatus(self, targetlist):#更新攻击状态
+        pass
+    
+    @abstractmethod
+    def IsDamageTick(self):
         pass
    
-class Player(Movable, CanAttack, Drawable):
+class HasCoordinate(ABC):
+    @abstractmethod
+    def GetScreenXY(self):
+        pass
+    
+    @abstractmethod
+    def GetCoordinate(self):
+        pass
+
+class ScreenXYUpdater(HasCoordinate):
+    def updateScreenXY(self, player):
+        playerScreenX, playerScreenY = player.GetScreenXY()
+        playerX, playerY = player.GetCoordinate()
+        selfX, selfY = self.GetCoordinate()
+        screenX = selfX - playerX + playerScreenX
+        screenY = selfY - playerY + playerScreenY
+        self.LoadScreenCoordinate(screenX, screenY)
+
+    @abstractmethod
+    def LoadScreenCoordinate(self, X, Y):
+        pass
+
+class Drawable(HasCoordinate):
+    @abstractmethod
+    def Draw():
+        pass
+       
+
+class Player(Movable, CanAttack, Drawable, Attackable):
     def __init__(self, NAME, ATK, HP, width, height):
         self.player_width, self.player_height = width, height
         self.player_speed = 10
@@ -150,11 +254,18 @@ class Player(Movable, CanAttack, Drawable):
         self.AtkCounter = 0
         self.facing_right = True 
         
+        self.isdmgtick = False
         self.IsAttacking = False
         self.CanAtkWho = [barrier, Enemy]
         self.IsCollidable = False
         self.atkType = "player"
 
+    def GetCoordinate(self):
+        return self.player_x, self.player_y
+    
+    def GetScreenXY(self):
+        return self.Drawx, self.Drawy
+    
     def GetCenterCoordinate(self):    
         return self.player_x + self.player_width//2, self.player_y + self.player_height//2
          
@@ -164,21 +275,29 @@ class Player(Movable, CanAttack, Drawable):
         else:
             screen.blit(ImgLeft, (self.Drawx, self.Drawy))
     
-    def createplayer():#外部调用的接口
-        user1 = Player("Cosmos",10,100, 150, 150)
+    @staticmethod
+    def createplayer(name, atk, hp, width, height):#外部调用的接口
+        user1 = Player(name, atk, hp, width, height)
         return user1
     
-    def AtkStatus(self):
+    def AtkStatus(self, tglist):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_f] and self.AtkCounter == 0:
             self.AtkCounter = 40
         if self.AtkCounter > 0:
             self.AtkCounter -= 1
+        if self.AtkCounter == 35:
+            self.isdmgtick = True
+        else:
+            self.isdmgtick = False
         if self.AtkCounter > 30:
             self.IsAttacking = True
             return
         self.IsAttacking = False
            
+    def drawOnAtk(self, screen):
+        pass
+    
     def drawAtk(self,screen):
         attack_radius = self.atkradius
         player_center = (self.Drawx + self.player_width//2,
@@ -188,6 +307,8 @@ class Player(Movable, CanAttack, Drawable):
         pygame.draw.circle(surface, (255, 255, 255, 80), (attack_radius, attack_radius), attack_radius)
         screen.blit(surface, (player_center[0] - attack_radius, player_center[1] - attack_radius))
     
+    def IsDamageTick(self):
+        return self.isdmgtick
     
     def Move(self,bars):#传入障碍物数组
         keys = pygame.key.get_pressed()
@@ -235,12 +356,14 @@ class Player(Movable, CanAttack, Drawable):
             return True
         return False
         
-class barrier(Attackable, Drawable):
+class barrier(ScreenXYUpdater, Attackable, Drawable):
     def __init__(self,x,y,length, Img):
         self.x = x
         self.y = y
         self.length = length
         self.Img = Img
+        self.ScreenX = self.x
+        self.ScreenY = self.y
         
         self.IsCollidable = True
         self.hp = 1
@@ -262,6 +385,16 @@ class barrier(Attackable, Drawable):
 
     def drawOnAtk(self, screen):
         pass
+    
+    def LoadScreenCoordinate(self, X, Y):
+        self.ScreenX = X
+        self.ScreenY = Y
+    
+    def GetCoordinate(self):
+        return self.x, self.y
+        
+    def GetScreenXY(self):
+        return self.ScreenX, self.ScreenY
         
     def GetCenterCoordinate(self):
         x = self.x
@@ -270,16 +403,17 @@ class barrier(Attackable, Drawable):
     
     #draw方法
     def Draw(self, screen, player):
-        #算出距离玩家绘制坐标的差值
-        screen_x = self.x - player.player_x + player.Drawx
-        screen_y = self.y - player.player_y + player.Drawy
         #出屏幕就不画
-        if -self.length < screen_x < WIDTH and -self.length < screen_y < HEIGHT:
-            screen.blit(self.Img, (screen_x, screen_y))
+        if -self.length < self.ScreenX < WIDTH and -self.length < self.ScreenY < HEIGHT:
+            screen.blit(self.Img, (self.ScreenX, self.ScreenY))
     
 class Map(Drawable):
     def __init__(self,rowlen,collen,TileSize):
         self.IsCollidable = False
+        self.x = 0
+        self.y = 0
+        self.ScreenX = 0
+        self.ScreenY = 0
         
         scale = 0.15
         self.TileSize = TileSize
@@ -304,10 +438,17 @@ class Map(Drawable):
                 else:
                     tile = 8   # 山地
                 self.map[i][j] = tile
-        
+    
+    @staticmethod    
     def getMap(rowlen,collen,TileSize):#外部调用方法
         map = Map(rowlen,collen,TileSize)
         return map
+    
+    def GetScreenXY(self):
+        return self.ScreenX, self.ScreenY
+    
+    def GetCoordinate(self):
+        return self.x, self.y
     
     def Draw(self, screen, textures, player):#map_obj是getmap返回的，textures是被切割好的图形数组
         for row in range(self.rowlen):
@@ -323,7 +464,7 @@ class Map(Drawable):
                 if -self.TileSize < screen_x < WIDTH and -self.TileSize < screen_y < HEIGHT:
                     screen.blit(texture, (screen_x, screen_y))
                     
-class Enemy(Attackable, Movable, Drawable):
+class Enemy(ScreenXYUpdater, CanAttack, Attackable, Movable, Drawable):
     def __init__(self,atk,hp,speed,radius, atkradius, Img):
         self.hp = hp
         self.atk = atk
@@ -332,13 +473,17 @@ class Enemy(Attackable, Movable, Drawable):
         self.x = random.randint(0, 2*WIDTH)
         self.y = random.randint(0, 2*HEIGHT)
         self.Img = Img
+        self.screen_x = self.x
+        self.screen_y = self.y
         
+        self.Counter = 0
         self.atkradius = atkradius
         self.IsAttacking = False
+        self.isdmgtick = False
         self.CanAtkWho = [Player]
         self.IsCollidable = False
         self.atkType = "enemynormal"
-        
+    
     def getEnemy(atk,hp,speed,radius,atkradius, Img):
         enemy = Enemy(atk,hp,speed,radius,atkradius, Img)
         return enemy
@@ -354,14 +499,53 @@ class Enemy(Attackable, Movable, Drawable):
             self.x += self.speed * dx / distance
             self.y += self.speed * dy / distance
             
-    def Draw(self, screen, player):
-        screen_x = self.x - player.player_x + player.Drawx
-        screen_y = self.y - player.player_y + player.Drawy
-        if -self.radius < screen_x < WIDTH and -self.radius < screen_y < HEIGHT:
-            screen.blit(self.Img, (screen_x, screen_y))
+    def GetCoordinate(self):
+        return self.x, self.y
     
-    def AtkStatus(self):
-        pass
+    def GetScreenXY(self):
+        return self.screen_x, self.screen_y
+    
+    def LoadScreenCoordinate(self, X, Y):
+        self.screen_x = X
+        self.screen_y = Y
+    
+    def Draw(self, screen, player):
+        if -self.radius < self.screen_x < WIDTH and -self.radius < self.screen_y < HEIGHT:
+            screen.blit(self.Img, (self.screen_x, self.screen_y))
+    
+    def drawAtk(self, screen):
+        attack_radius = self.atkradius
+        x, y = self.GetScreenXY()
+        x = x + self.radius
+        y = y + self.radius
+        # 半透明圆效果
+        surface = pygame.Surface((2*attack_radius, 2*attack_radius), pygame.SRCALPHA)
+        pygame.draw.circle(surface, (255, 255, 255, 80), (attack_radius, attack_radius), attack_radius)
+        screen.blit(surface, (x - attack_radius, y - attack_radius))
+    
+    def AtkStatus(self, targetlist):
+        Atk = False
+        for target in targetlist:
+            if not self.IsInRadius(target):
+                continue
+            for cawobj in self.CanAtkWho:
+                if isinstance(target, cawobj):
+                    Atk = True
+        if self.Counter > 0:
+            self.Counter -= 1
+        if self.Counter == 55:
+            self.isdmgtick = True
+        elif True:
+            self.isdmgtick = False
+        if self.Counter > 50:
+            self.IsAttacking = True
+            return
+        if self.Counter == 0 and Atk == True:
+            self.Counter = 60
+        self.IsAttacking = False
+    
+    def IsDamageTick(self):
+        return self.isdmgtick
     
     def drawOnAtk(self, screen):
         pass
