@@ -5,74 +5,10 @@ import math
 from abc import ABC, abstractmethod
 
 
-WIDTH, HEIGHT = 1000, 800
+WIDTH, HEIGHT = 1200, 800
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
     
-
-class interfaceManager():
-    def __init__(self, screen, basepath, gameworld):
-        self.screen = screen
-        self.window = "menu"
-        self.basepath = basepath
-        self.font = pygame.font.SysFont("Arial", 40)
-        self.menu = mainMenu(self.screen, self.font)
-        self.event = pygame.event.get()
-        self.gameworld = gameworld
-        
-    def drawWindow(self):
-        if self.window == "menu":
-            self.menu.drawMenu()
-        elif self.window == "game":
-            pass
-        
-    def updateWindow(self):
-        self.event = pygame.event.get()
-        
-        choice = self.menu.clickHandle(self.event)   
-                                  
-        if choice == "start":
-            self.window = "game"
-        elif choice == "quit":
-            self.window = "quit"
-        elif choice == "menu":
-            self.window = "menu"
-
-class pageChecker():
-    def __init__(self):
-        pass
-           
-class mainMenu():
-    def __init__(self, screen, font):
-        self.screen = screen
-        self.font = font
-        self.buttons = {
-            "start": pygame.Rect(300, 200, 200, 60),
-            "quit": pygame.Rect(300, 300, 200, 60),
-        }
-        
-    def drawMenu(self):
-        self.screen.fill((30, 30, 60))
-        for text, rect in self.buttons.items():
-            pygame.draw.rect(self.screen, (100, 100, 200), rect)
-            label = self.font.render(text.upper(), True, (255, 255, 255))
-            self.screen.blit(label, (rect.x + 50, rect.y + 15))
-            
-    def clickHandle(self, events):
-        for e in events:
-            if e.type == pygame.MOUSEBUTTONDOWN:
-                mx, my = e.pos
-                for name, rect in self.buttons.items():
-                    if rect.collidepoint(mx, my):
-                        return name
-        return None      
-
-class gameLoader():
-    def __init__(self, screen, basepath):
-        self.screen = screen
-        self.basepath = basepath
     
-    def iniGame(self):
-        pass
 
 class GameWorld():#干脆就把整个gameworld类传进去吧，省的各种打包
     def __init__(self, totalObj, 
