@@ -1,7 +1,7 @@
 import os, pygame
 from glogic import Player
 import glogic
-import window
+import windowset
 
 # 初始化 Pygame
 pygame.init()
@@ -100,7 +100,7 @@ GameWorld = glogic.GameWorld(
     user1
     )
 
-window = window.interfaceManager(screen, base_path, GameWorld)
+window = windowset.interfaceManager(screen, base_path, GameWorld)
 
 # 游戏主循环
 running = True

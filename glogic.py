@@ -3,6 +3,7 @@ import random
 import noise
 import math
 from abc import ABC, abstractmethod
+import windowset
 
 
 WIDTH, HEIGHT = 1200, 800
@@ -10,7 +11,7 @@ CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
     
     
 
-class GameWorld():#干脆就把整个gameworld类传进去吧，省的各种打包
+class GameWorld(windowset.loadtexture):#干脆就把整个gameworld类传进去吧，省的各种打包
     def __init__(self, totalObj, 
                  drawable, movable, 
                  screen, player):
@@ -25,6 +26,9 @@ class GameWorld():#干脆就把整个gameworld类传进去吧，省的各种打�
         self.removedObj = []
         self.DrawXYneeder = []
 
+    def loadtex(self):
+        return super().loadtex()
+    
     def escapeHandle(self, events):
         for e in events:
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
@@ -399,6 +403,10 @@ class Map(Drawable):
 
                 if -self.TileSize < screen_x < WIDTH and -self.TileSize < screen_y < HEIGHT:
                     screen.blit(texture, (screen_x, screen_y))
+          
+class maptile():
+    def __init__(self, size):
+        self.size = size
                     
 class Enemy(ScreenXYUpdater, CanAttack, Attackable, Movable, Drawable):
     def __init__(self,atk,hp,speed,radius, atkradius, Img):
@@ -488,3 +496,9 @@ class Enemy(ScreenXYUpdater, CanAttack, Attackable, Movable, Drawable):
     
     def GetCenterCoordinate(self):
         return self.x + self.radius, self.y + self.radius
+    
+class statusbar():
+    def __init__(self):
+        pass
+
+
